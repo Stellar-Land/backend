@@ -644,6 +644,70 @@ describe('EventsService', () => {
         ticketTypes: [{ priceDisplay: '1.234500 USDC' }],
       });
     });
+
+    describe('filters', () => {
+      const from = new Date('2026-11-01T00:00:00.000Z');
+      const to = new Date('2026-11-30T23:59:59.000Z');
+      const textMatch = (q: string) => ({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { venue: { contains: q, mode: 'insensitive' } },
+        ],
+      });
+
+      beforeEach(() => {
+        prisma.event.findMany.mockResolvedValue([]);
+        prisma.event.count.mockResolvedValue(0);
+      });
+
+      const expectWhere = (where: object) => {
+        expect(prisma.event.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where }),
+        );
+        expect(prisma.event.count).toHaveBeenCalledWith({ where });
+      };
+
+      it('matches q against name or venue, case-insensitively', async () => {
+        await service.findPublished({ page: 1, limit: 20, q: 'jazz' });
+        expectWhere({ ...publishedWhere, ...textMatch('jazz') });
+      });
+
+      it('filters by category', async () => {
+        await service.findPublished({
+          page: 1,
+          limit: 20,
+          category: 'CONCERTS',
+        });
+        expectWhere({ ...publishedWhere, category: 'CONCERTS' });
+      });
+
+      it('filters by a lower bound on startsAt', async () => {
+        await service.findPublished({ page: 1, limit: 20, from });
+        expectWhere({ ...publishedWhere, startsAt: { gte: from } });
+      });
+
+      it('filters by an upper bound on startsAt', async () => {
+        await service.findPublished({ page: 1, limit: 20, to });
+        expectWhere({ ...publishedWhere, startsAt: { lte: to } });
+      });
+
+      it('combines every filter with AND', async () => {
+        await service.findPublished({
+          page: 1,
+          limit: 20,
+          q: 'jazz',
+          category: 'CONCERTS',
+          from,
+          to,
+        });
+        expectWhere({
+          ...publishedWhere,
+          category: 'CONCERTS',
+          startsAt: { gte: from, lte: to },
+          ...textMatch('jazz'),
+        });
+      });
+    });
   });
 
   describe('unpublish', () => {

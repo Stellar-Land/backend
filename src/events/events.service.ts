@@ -12,12 +12,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { StellarService } from '../stellar/stellar.service';
 import { AuditService } from '../audit/audit.service';
-import {
-  DEFAULT_PAGE_LIMIT,
-  PaginationQueryDto,
-} from '../common/dto/pagination-query.dto';
+import { DEFAULT_PAGE_LIMIT } from '../common/dto/pagination-query.dto';
 import { toSkipTake } from '../common/pagination/paginated';
 import { CreateEventDto } from './dto/create-event.dto';
+import { ListPublishedEventsQueryDto } from './dto/list-published-events-query.dto';
 import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
 import { CACHE_STORE } from '../common/cache/cache-store';
 import { Inject } from '@nestjs/common';
@@ -275,12 +273,27 @@ export class EventsService {
   }
 
   /** One page of published events plus the total count, for `GET /events`. */
-  async findPublished(query: PaginationQueryDto) {
+  async findPublished(query: ListPublishedEventsQueryDto) {
     // #207 — exclude soft-deleted events and events of soft-deleted orgs.
-    const where = {
+    // Optional filters are ANDed on; `status`/`category`/`startsAt` are
+    // covered by the `Event_status_category_startsAt_idx` index.
+    const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       deletedAt: null,
       organization: { deletedAt: null },
+      ...(query.category && { category: query.category }),
+      ...((query.from || query.to) && {
+        startsAt: {
+          ...(query.from && { gte: query.from }),
+          ...(query.to && { lte: query.to }),
+        },
+      }),
+      ...(query.q && {
+        OR: [
+          { name: { contains: query.q, mode: 'insensitive' } },
+          { venue: { contains: query.q, mode: 'insensitive' } },
+        ],
+      }),
     };
     const [events, total] = await this.prisma.$transaction([
       this.prisma.event.findMany({

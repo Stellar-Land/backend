@@ -437,8 +437,18 @@ soonest first, each with its visible ticket types and the organizer's
 name and slug. Served with `Cache-Control: public, max-age=60, s-maxage=300`
 and an application cache (`CACHE_TTL_SECONDS`).
 
+Optional filters, combined with AND (invalid values return `400`):
+
+| Param      | Description                                                         |
+| ---------- | ------------------------------------------------------------------- |
+| `q`        | Case-insensitive substring of the event name or venue (1–100 chars) |
+| `category` | One of the `Industry` values, e.g. `CONCERTS`                       |
+| `from`     | ISO 8601; only events with `startsAt >= from`                       |
+| `to`       | ISO 8601; only events with `startsAt <= to`; must not precede `from` |
+
 ```bash
 curl -s "$API/v1/events?page=1&limit=20"
+curl -s "$API/v1/events?q=jazz&category=CONCERTS&from=2026-11-01T00:00:00Z&to=2026-11-30T23:59:59Z"
 ```
 
 ```json

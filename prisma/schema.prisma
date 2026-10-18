@@ -181,6 +181,8 @@ model Event {
   updatedAt              DateTime        @updatedAt
 
   @@index([organizationId])
+  @@index([status, startsAt])
+  @@index([status, category, startsAt])
 }
 
 model TicketType {
